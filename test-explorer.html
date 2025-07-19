@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Explorer Test</title>
+</head>
+<body>
+    <h1>Testing Explorer Page</h1>
+    <script>
+        // Test if the Explorer page loads
+        fetch('http://localhost:3000/explorer')
+            .then(response => response.text())
+            .then(html => {
+                console.log('Explorer page response:', html.substring(0, 500));
+                if (html.includes('explorer') || html.includes('Explorer')) {
+                    console.log('✅ Explorer page is accessible');
+                } else {
+                    console.log('❌ Explorer page not found');
+                }
+            })
+            .catch(error => {
+                console.error('❌ Error accessing Explorer:', error);
+            });
+            
+        // Test the API endpoints
+        fetch('http://localhost:3001/api/network-stats')
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Network stats API working:', data.summary);
+            })
+            .catch(error => {
+                console.error('❌ Network stats API error:', error);
+            });
+            
+        fetch('http://localhost:3001/api/explorer/transactions?limit=1')
+            .then(response => response.json())
+            .then(data => {
+                console.log('✅ Transactions API working:', data.transactions?.length, 'transactions');
+            })
+            .catch(error => {
+                console.error('❌ Transactions API error:', error);
+            });
+    </script>
+</body>
+</html>
