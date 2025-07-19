@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kiln Frontend Functionality Test</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; color: #155724; }
+        .info { background: #d1ecf1; border: 1px solid #bee5eb; color: #0c5460; }
+        .warning { background: #fff3cd; border: 1px solid #ffeaa7; color: #856404; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; color: #721c24; }
+        h1 { color: #ff6b35; }
+        code { background: #f1f3f4; padding: 2px 4px; border-radius: 3px; }
+        .command { background: #f8f9fa; padding: 10px; border-radius: 4px; margin: 10px 0; font-family: monospace; }
+        ul { line-height: 1.6; }
+        li { margin: 8px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Kiln Frontend Functionality Test</h1>
+        
+        <div class="status info">
+            <strong>Test Status:</strong> Ready to test enhanced functionality with console logging
+        </div>
+
+        <h2>🎯 What We've Enhanced</h2>
+        <ul>
+            <li><strong>Enhanced Navigation:</strong> Wallet connect, notifications, settings, profile menu, search</li>
+            <li><strong>Enhanced Dashboard:</strong> Interactive metric cards with hover actions, watchlist, refresh</li>
+            <li><strong>Search Component:</strong> Real-time search with dropdown results</li>
+            <li><strong>Context Management:</strong> Global state for wallet, notifications, watchlist</li>
+            <li><strong>Console Logging:</strong> All interactions now log to browser console for testing</li>
+        </ul>
+
+        <h2>🔧 To Test Functionality</h2>
+        
+        <div class="status warning">
+            <strong>Step 1:</strong> Start the development server
+        </div>
+        <div class="command">cd /Users/romanstadnikov/Desktop/KilnPM/client && npm start</div>
+
+        <div class="status warning">
+            <strong>Step 2:</strong> Open browser to <code>http://localhost:3000</code>
+        </div>
+
+        <div class="status warning">
+            <strong>Step 3:</strong> Open browser console (F12 → Console tab)
+        </div>
+
+        <div class="status warning">
+            <strong>Step 4:</strong> Test each interactive element systematically
+        </div>
+
+        <h2>🎛️ Interactive Elements to Test</h2>
+        
+        <h3>Navigation Bar (Top)</h3>
+        <ul>
+            <li>🔗 <strong>Wallet Connect Button:</strong> Click to test connection simulation</li>
+            <li>🔔 <strong>Notifications Bell:</strong> Click to open notification dropdown</li>
+            <li>⚙️ <strong>Settings Gear:</strong> Click to open settings menu</li>
+            <li>👤 <strong>Profile Avatar:</strong> Click to open profile menu</li>
+            <li>🔍 <strong>Search Bar:</strong> Type to see search suggestions</li>
+        </ul>
+
+        <h3>Dashboard (Main Content)</h3>
+        <ul>
+            <li>📊 <strong>Metric Cards:</strong> Hover to see action buttons</li>
+            <li>⭐ <strong>Watchlist Toggle:</strong> Click star icon on metric cards</li>
+            <li>ℹ️ <strong>View Details:</strong> Click info icon on metric cards</li>
+            <li>🔄 <strong>Refresh Data:</strong> Click refresh button (top right)</li>
+        </ul>
+
+        <h2>🔍 Console Logging</h2>
+        <div class="status success">
+            All button clicks and interactions will now log detailed information to the browser console, including:
+            <ul>
+                <li>Wallet connection attempts</li>
+                <li>Notification menu interactions</li>
+                <li>Settings menu interactions</li>
+                <li>Search query changes</li>
+                <li>Dashboard card interactions</li>
+                <li>Watchlist modifications</li>
+                <li>Data refresh operations</li>
+            </ul>
+        </div>
+
+        <h2>✅ Expected Behavior</h2>
+        <ul>
+            <li><strong>Wallet Connect:</strong> Should show loading state then success/connected state</li>
+            <li><strong>Notifications:</strong> Should show dropdown with mock notifications</li>
+            <li><strong>Settings:</strong> Should show dropdown with theme toggle and preferences</li>
+            <li><strong>Search:</strong> Should show filtered results as you type</li>
+            <li><strong>Metric Cards:</strong> Should show hover effects with action buttons</li>
+            <li><strong>Watchlist:</strong> Should toggle star state and show notification</li>
+            <li><strong>Refresh:</strong> Should show loading spinner then success notification</li>
+        </ul>
+
+        <div class="status info">
+            <strong>Next Steps:</strong> After testing, we'll fix any issues found and continue with additional features!
+        </div>
+    </div>
+</body>
+</html>
