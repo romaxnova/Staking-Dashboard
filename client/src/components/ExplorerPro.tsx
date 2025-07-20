@@ -39,9 +39,7 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Badge,
-  useTheme,
-  useMediaQuery
+  Badge
 } from '@mui/material';
 import {
   TrendingUp,
@@ -61,9 +59,9 @@ import {
   MonetizationOn,
   AutoAwesome,
   Notifications,
-  BookmarkAdd
+  BookmarkAdd,
+  People
 } from '@mui/icons-material';
-import { exportStakingPerformanceToPDF } from '../utils/exportUtils';
 
 interface StakingStats {
   totalStaked: string;
@@ -102,16 +100,12 @@ interface StakingTransaction {
 }
 
 const ExplorerPro: React.FC = () => {
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
-  
   const [stats, setStats] = useState<StakingStats | null>(null);
   const [integrators, setIntegrators] = useState<StakingIntegrator[]>([]);
   const [transactions, setTransactions] = useState<StakingTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedTab, setSelectedTab] = useState(0);
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [sortBy, setSortBy] = useState('time');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
@@ -133,12 +127,10 @@ const ExplorerPro: React.FC = () => {
   const [speedDialOpen, setSpeedDialOpen] = useState(false);
   
   // Animation states
-  const [animate, setAnimate] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchStakingData();
-    setAnimate(true);
     // Auto-refresh every 30 seconds
     const interval = setInterval(fetchStakingData, 30000);
     return () => clearInterval(interval);
@@ -1832,7 +1824,7 @@ const ExplorerPro: React.FC = () => {
                   color={selectedIntegrator.type === 'liquid' ? 'primary' : 'secondary'}
                 />
                 <Typography variant="caption" color="text.secondary" sx={{ mt: 1, display: 'block' }}>
-                  Ranks #{integrators.findIndex(i => i.name === selectedIntegrator.name) + 1} among staking providers
+                  Ranks #{integrators.findIndex(i => i.name === selectedIntegrator.name) +  1} among staking providers
                 </Typography>
               </Box>
             </DialogContent>
