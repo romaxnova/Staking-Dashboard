@@ -1,24 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Card, CardContent, Chip, CircularProgress, Alert } from '@mui/material';
 
-interface Stake {
-  id: string;
-  token_symbol: string;
-  balance: string;
-  totalValue: number;
-  estimatedAnnualRewards: number;
-  status: string;
-  network_gross_apy: number;
-  validator_address?: string;
-}
-
-interface StakeSummary {
-  totalValue: number;
-  totalRewards: number;
-  activeStakes: number;
-  avgAPY: number;
-}
-
 interface Account {
   id: string;
   name: string;
