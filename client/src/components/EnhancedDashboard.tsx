@@ -41,6 +41,8 @@ import {
   InfoOutlined,
 } from '@mui/icons-material';
 import { useAppContext } from '../context/AppContext';
+import MetricDetailsDialog from './MetricDetailsDialog';
+import etherscanService from '../services/etherscanService';
 
 interface MetricCardProps {
   title: string;
@@ -215,54 +217,19 @@ const MetricCard: React.FC<MetricCardProps> = ({
           </Box>
 
           {/* Details Dialog */}
-          <Dialog open={detailsOpen} onClose={() => setDetailsOpen(false)} maxWidth="sm" fullWidth>
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Avatar sx={{ backgroundColor: alpha(theme.palette.primary.main, 0.1), color: theme.palette.primary.main }}>
-                {icon}
-              </Avatar>
-              {title} Details
-            </DialogTitle>
-            <DialogContent>
-              <Stack spacing={2}>
-                <Box>
-                  <Typography variant="h4" sx={{ fontWeight: 700, mb: 1 }}>
-                    {value}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {subtitle}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Typography variant="body2">24h Change:</Typography>
-                  <Chip
-                    size="small"
-                    label={change}
-                    icon={
-                      changeType === 'positive' ? (
-                        <TrendingUp sx={{ fontSize: '16px !important' }} />
-                      ) : changeType === 'negative' ? (
-                        <TrendingDown sx={{ fontSize: '16px !important' }} />
-                      ) : undefined
-                    }
-                    sx={{
-                      backgroundColor: alpha(getChangeColor(), 0.1),
-                      color: getChangeColor(),
-                      fontWeight: 600,
-                    }}
-                  />
-                </Box>
-                <Alert severity="info" icon={<InfoOutlined />}>
-                  This metric is updated in real-time and reflects the current state of the Ethereum network.
-                </Alert>
-              </Stack>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setDetailsOpen(false)}>Close</Button>
-              <Button variant="contained" onClick={handleWatchlistToggle}>
-                {isWatched ? 'Remove from Watchlist' : 'Add to Watchlist'}
-              </Button>
-            </DialogActions>
-          </Dialog>
+          <MetricDetailsDialog
+            open={detailsOpen}
+            onClose={() => setDetailsOpen(false)}
+            metricType={title.toLowerCase().replace(/\s+/g, '_')}
+            title={title}
+            value={value}
+            change={change}
+            changeType={changeType}
+            icon={icon}
+            subtitle={subtitle}
+            isWatched={isWatched}
+            onWatchlistToggle={handleWatchlistToggle}
+          />
         </CardContent>
       </Card>
     </Zoom>
@@ -275,66 +242,150 @@ const EnhancedDashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [realTimeData, setRealTimeData] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch real data from Etherscan
+  const fetchRealTimeData = async () => {
+    try {
+      console.log('Fetching real-time data from Etherscan...');
+      setError(null);
+      
+      // Start with just ETH price - the simplest endpoint
+      const ethPrice = await etherscanService.getEthPrice();
+      console.log('ETH Price data received:', ethPrice);
+      
+      const currentPrice = parseFloat(ethPrice.ethusd);
+      
+      const data = {
+        ethPrice: currentPrice,
+        lastUpdated: new Date().toISOString()
+      };
+      
+      console.log('Processed data:', data);
+      setRealTimeData(data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching real-time data:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch data');
+    }
+  };
 
   useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 1000);
-    return () => clearTimeout(timer);
+    const initializeData = async () => {
+      setLoading(true);
+      await fetchRealTimeData();
+      setLoading(false);
+    };
+
+    initializeData();
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(fetchRealTimeData, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleRefreshData = async () => {
-    console.log('Refresh data button clicked!');
+    console.log('Manual refresh triggered');
     setRefreshing(true);
     
-    // Simulate API call
-    console.log('Starting data refresh simulation...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    console.log('Data refresh simulation complete!');
+    try {
+      await fetchRealTimeData();
+      setSnackbarOpen(true);
+      addNotification({
+        title: 'Data Refreshed',
+        message: 'Dashboard metrics updated with latest Etherscan data',
+        type: 'success',
+        read: false,
+      });
+    } catch (err) {
+      addNotification({
+        title: 'Refresh Failed',
+        message: 'Failed to fetch latest data. Please try again.',
+        type: 'error',
+        read: false,
+      });
+    }
     
     setRefreshing(false);
-    setSnackbarOpen(true);
-    
-    addNotification({
-      title: 'Data Refreshed',
-      message: 'Dashboard metrics have been updated with the latest data',
-      type: 'success',
-      read: false,
-    });
   };
 
-  const metrics = [
-    {
-      title: 'Total Staked',
-      value: '1,158,610 ETH',
-      change: '+5.2% (24h)',
-      changeType: 'positive' as const,
-      icon: <AccountBalance />,
-      subtitle: '$4.13B USD Value',
-    },
-    {
-      title: 'Active Validators',
-      value: '35,559',
-      change: '+127 (24h)',
-      changeType: 'positive' as const,
-      icon: <Security />,
-      subtitle: '99.98% Uptime',
-    },
-    {
-      title: 'Network APR',
-      value: '3.42%',
-      change: '+0.05% (7d)',
-      changeType: 'positive' as const,
-      icon: <MonetizationOn />,
-      subtitle: 'Annualized Return',
-    },
-    {
-      title: 'Unique Integrators',
-      value: '147,020',
-      change: '+2,341 (24h)',
-      changeType: 'positive' as const,
-      icon: <Group />,
-      subtitle: 'Active Users',
-    },
-  ];
+  // Generate metrics with real data
+  const getMetrics = () => {
+    if (!realTimeData) {
+      return [
+        {
+          title: 'ETH Price',
+          value: 'Loading...',
+          change: '...',
+          changeType: 'neutral' as const,
+          icon: <MonetizationOn />,
+          subtitle: 'Live from Etherscan',
+        },
+        {
+          title: 'Active Validators',
+          value: '35,559',
+          change: '+127 (24h)',
+          changeType: 'positive' as const,
+          icon: <Security />,
+          subtitle: '99.98% Uptime (Placeholder)',
+        },
+        {
+          title: 'Network APR',
+          value: '3.42%',
+          change: '+0.05% (7d)',
+          changeType: 'positive' as const,
+          icon: <AccountBalance />,
+          subtitle: 'Annualized Return (Placeholder)',
+        },
+        {
+          title: 'Unique Integrators',
+          value: '147,020',
+          change: '+2,341 (24h)',
+          changeType: 'positive' as const,
+          icon: <Group />,
+          subtitle: 'Active Users (Placeholder)',
+        },
+      ];
+    }
+
+    return [
+      {
+        title: 'ETH Price',
+        value: `$${realTimeData.ethPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        change: 'Live data ✓',
+        changeType: 'positive' as const,
+        icon: <MonetizationOn />,
+        subtitle: `Updated: ${new Date(realTimeData.lastUpdated).toLocaleTimeString()}`,
+      },
+      {
+        title: 'Active Validators',
+        value: '35,559',
+        change: '+127 (24h)',
+        changeType: 'positive' as const,
+        icon: <Security />,
+        subtitle: '99.98% Uptime (Placeholder)',
+      },
+      {
+        title: 'Network APR',
+        value: '3.42%',
+        change: '+0.05% (7d)',
+        changeType: 'positive' as const,
+        icon: <AccountBalance />,
+        subtitle: 'Annualized Return (Placeholder)',
+      },
+      {
+        title: 'Unique Integrators',
+        value: '147,020',
+        change: '+2,341 (24h)',
+        changeType: 'positive' as const,
+        icon: <Group />,
+        subtitle: 'Active Users (Placeholder)',
+      },
+    ];
+  };
+
+  const metrics = getMetrics();
 
   const topIntegrators = [
     { name: 'Ledger Live', amount: '426,400 ETH', value: '$1.52B', type: 'Dedicated', provider: 'Kiln', logo: '🔷' },
@@ -365,8 +416,18 @@ const EnhancedDashboard: React.FC = () => {
                 Welcome back to KilnPM
               </Typography>
               <Typography variant="h6" color="text.secondary" sx={{ fontWeight: 400 }}>
-                Your comprehensive Ethereum staking dashboard
+                Live Ethereum data powered by Etherscan API
+                {realTimeData && (
+                  <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
+                    Last updated: {new Date(realTimeData.lastUpdated).toLocaleTimeString()}
+                  </Typography>
+                )}
               </Typography>
+              {error && (
+                <Alert severity="warning" sx={{ mt: 2, maxWidth: 500 }}>
+                  <strong>API Error:</strong> {error}. Using cached data if available.
+                </Alert>
+              )}
             </Box>
             <Box sx={{ display: 'flex', gap: 2 }}>
               <Button

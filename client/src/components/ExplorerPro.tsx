@@ -128,6 +128,7 @@ const ExplorerPro: React.FC = () => {
   const [transactionFilter, setTransactionFilter] = useState('all');
   const [sortBy, setSortBy] = useState('time');
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date());
+  const [usingRealData, setUsingRealData] = useState(false);
   
   // Modal states
   const [selectedTransaction, setSelectedTransaction] = useState<StakingTransaction | null>(null);
@@ -260,50 +261,128 @@ const ExplorerPro: React.FC = () => {
   };
 
   const generateStakingTransactions = async (validators: any[], stats: StakingStats): Promise<StakingTransaction[]> => {
-    // Try to get real Ethereum deposit contract transactions
+    // Fetch real Ethereum transactions directly from Etherscan
     try {
+      const etherscanApiKey = process.env.REACT_APP_ETHERSCAN_API_KEY;
       const ethDepositContract = '0x00000000219ab540356cbb839cbe05303d7705fa';
       
-      // Fetch transactions to/from the ETH 2.0 deposit contract
-      const txResponse = await fetch(`http://localhost:3001/api/explorer/transactions?limit=50`);
-      if (txResponse.ok) {
-        const txData = await txResponse.json();
-        
-        // Filter and transform real transactions into staking-focused format
-        const stakingTxs = txData.transactions
-          .filter((tx: any) => 
-            // Filter for staking-related transactions (32 ETH deposits, withdrawal amounts, etc.)
-            tx.to === ethDepositContract || 
-            parseFloat(tx.amount) === 32 || 
-            parseFloat(tx.amount) >= 16 // Partial withdrawals
-          )
-          .map((tx: any): StakingTransaction => ({
-            hash: tx.hash,
-            type: parseFloat(tx.amount) >= 32 ? 'deposit' : 'withdrawal',
-            amount: parseFloat(tx.amount.replace(' ETH', '')),
-            amountETH: tx.amount,
-            amountUSD: tx.amountUsd,
-            validator: validators[Math.floor(Math.random() * validators.length)]?.public_key?.substring(0, 20) + '...',
-            depositor: tx.from,
-            integrator: tx.integrator,
-            timestamp: tx.timestamp,
-            blockNumber: tx.blockNumber || 0,
-            status: 'confirmed',
-            fee: Math.random() * 0.01
-          }));
+      if (!etherscanApiKey) {
+        console.warn('⚠️ Etherscan API key not found in environment variables');
+        throw new Error('No Etherscan API key');
+      }
 
-        if (stakingTxs.length > 0) {
-          console.log('✅ Using real staking transactions:', stakingTxs.length);
-          return stakingTxs;
+      console.log('🔍 Fetching real transactions from Etherscan API...');
+      
+      // Get latest block number
+      const blockResponse = await fetch(`https://api.etherscan.io/api?module=proxy&action=eth_blockNumber&apikey=${etherscanApiKey}`);
+      const blockData = await blockResponse.json();
+      
+      if (blockData.status === '0') {
+        throw new Error(`Etherscan API error: ${blockData.message}`);
+      }
+      
+      const latestBlockHex = blockData.result;
+      const latestBlock = parseInt(latestBlockHex, 16);
+      
+      // Get recent blocks and their transactions
+      const recentTransactions: StakingTransaction[] = [];
+      
+      // First, try to get transactions to the Ethereum 2.0 Deposit Contract
+      const depositContractResponse = await fetch(`https://api.etherscan.io/api?module=account&action=txlist&address=${ethDepositContract}&startblock=0&endblock=99999999&sort=desc&apikey=${etherscanApiKey}&page=1&offset=20`);
+      const depositData = await depositContractResponse.json();
+      
+      if (depositData.status === '1' && depositData.result) {
+        depositData.result.forEach((tx: any) => {
+          const valueInEth = parseInt(tx.value, 16) / 1e18;
+          if (valueInEth === 32) { // Exactly 32 ETH = validator deposit
+            recentTransactions.push({
+              hash: tx.hash,
+              type: 'deposit',
+              amount: valueInEth,
+              amountETH: `${valueInEth.toFixed(4)} ETH`,
+              amountUSD: `$${(valueInEth * stats.ethPrice).toLocaleString()}`,
+              validator: `0x${Math.random().toString(16).substr(2, 40)}...`, // Mock validator pubkey
+              depositor: tx.from,
+              integrator: 'Ethereum 2.0 Deposit Contract',
+              timestamp: new Date(parseInt(tx.timeStamp) * 1000).toISOString(),
+              blockNumber: parseInt(tx.blockNumber),
+              status: 'confirmed',
+              fee: parseInt(tx.gasPrice) * parseInt(tx.gasUsed) / 1e18
+            });
+          }
+        });
+      }
+      
+      // Also get some recent large transactions that might be staking-related
+      for (let i = 0; i < 3 && recentTransactions.length < 15; i++) {
+        const blockNum = '0x' + (latestBlock - i).toString(16);
+        const blockDetailsResponse = await fetch(`https://api.etherscan.io/api?module=proxy&action=eth_getBlockByNumber&tag=${blockNum}&boolean=true&apikey=${etherscanApiKey}`);
+        const blockDetails = await blockDetailsResponse.json();
+        
+        if (blockDetails.result && blockDetails.result.transactions) {
+          const blockTxs = blockDetails.result.transactions.slice(0, 10); // Get first 10 transactions per block
+          
+          blockTxs.forEach((tx: any) => {
+            const valueInEth = parseInt(tx.value, 16) / 1e18;
+            // Focus on staking-relevant transactions
+            if (valueInEth >= 32 || // Full validator deposits
+                (valueInEth >= 16 && valueInEth < 32) || // Partial withdrawals  
+                (valueInEth > 0.1 && valueInEth < 2)) { // Likely rewards
+              
+              const transactionType = valueInEth >= 32 ? 'deposit' : 
+                                    valueInEth >= 16 ? 'withdrawal' : 'reward';
+              
+              recentTransactions.push({
+                hash: tx.hash,
+                type: transactionType,
+                amount: valueInEth,
+                amountETH: `${valueInEth.toFixed(4)} ETH`,
+                amountUSD: `$${(valueInEth * stats.ethPrice).toLocaleString()}`,
+                validator: validators[Math.floor(Math.random() * validators.length)]?.public_key?.substring(0, 20) + '...',
+                depositor: tx.from,
+                integrator: tx.to === ethDepositContract ? 'Ethereum 2.0 Deposit Contract' : getIntegratorFromAddress(tx.to),
+                timestamp: new Date(parseInt(blockDetails.result.timestamp, 16) * 1000).toISOString(),
+                blockNumber: parseInt(blockDetails.result.number, 16),
+                status: 'confirmed',
+                fee: parseInt(tx.gasPrice, 16) * parseInt(tx.gas, 16) / 1e18
+              });
+            }
+          });
         }
       }
+
+      if (recentTransactions.length > 0) {
+        console.log('✅ Using real Etherscan transactions:', recentTransactions.length);
+        setUsingRealData(true);
+        return recentTransactions;
+      }
     } catch (error) {
-      console.warn('⚠️ Could not fetch real staking transactions, generating realistic simulations');
+      console.error('❌ Etherscan API error:', error);
+      console.warn('⚠️ Falling back to simulated staking transactions');
+      setUsingRealData(false);
     }
 
-    // Fallback: Generate realistic staking transactions based on actual patterns
+    // Helper function to determine integrator from address
+    function getIntegratorFromAddress(address: string): string {
+      if (!address) return 'Unknown';
+      
+      const knownAddresses: { [key: string]: string } = {
+        '0x00000000219ab540356cbb839cbe05303d7705fa': 'Ethereum 2.0 Deposit Contract',
+        '0x4e5b2e1dc63f6b91cb6cd759936495434c7e972f': 'Rocket Pool',
+        '0xae7ab96520de3a18e5e111b5eaab095312d7fe84': 'Lido',
+        '0xa4c8d221d8bb851f83aadd0223a8900a6921a349': 'Coinbase',
+        '0x3cd751e6b0078be393132286c442345e5dc49699': 'Binance',
+        '0x8103151e2377e78c04a3d2564e20542680ed3096': 'Kraken'
+      };
+      
+      return knownAddresses[address.toLowerCase()] || 'Independent Staker';
+    }
+
+    // Fallback: Generate SIMULATED staking transactions (NOT REAL DATA)
+    console.log('🔄 Generating simulated staking transactions for demonstration');
+    setUsingRealData(false);
     const stakingTypes: StakingTransaction['type'][] = ['deposit', 'withdrawal', 'reward'];
-    const integrators = ['Lido', 'Coinbase', 'Kraken', 'Rocket Pool', 'Binance', 'Solo Staker'];
+    const integrators = ['Lido [SIMULATED]', 'Coinbase [SIMULATED]', 'Kraken [SIMULATED]', 'Rocket Pool [SIMULATED]', 'Binance [SIMULATED]', 'Solo Staker [SIMULATED]'];
 
     return Array.from({ length: 20 }, (_, i) => {
       const type = stakingTypes[Math.floor(Math.random() * stakingTypes.length)];
@@ -328,10 +407,15 @@ const ExplorerPro: React.FC = () => {
 
   const filteredTransactions = transactions
     .filter(tx => {
+      const searchLower = searchTerm.toLowerCase();
       const matchesSearch = !searchTerm || 
-        tx.hash.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.integrator.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        tx.validator?.toLowerCase().includes(searchTerm.toLowerCase());
+        tx.hash.toLowerCase().includes(searchLower) ||
+        tx.integrator.toLowerCase().includes(searchLower) ||
+        tx.validator?.toLowerCase().includes(searchLower) ||
+        tx.depositor?.toLowerCase().includes(searchLower) ||
+        tx.type.toLowerCase().includes(searchLower) ||
+        tx.amountETH.toLowerCase().includes(searchLower) ||
+        tx.blockNumber.toString().includes(searchTerm);
       
       const matchesFilter = transactionFilter === 'all' || tx.type === transactionFilter;
       
@@ -575,15 +659,30 @@ const ExplorerPro: React.FC = () => {
         {/* Staking Transactions */}
         <Paper elevation={3} sx={{ p: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-            <Typography variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-              🔄 Latest Staking Activity
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography variant="h5" gutterBottom sx={{ fontWeight: 600, mb: 0 }}>
+                🔄 Latest Staking Activity
+              </Typography>
+              <Chip 
+                size="small"
+                label={usingRealData ? "LIVE ETHERSCAN DATA" : "SIMULATED DATA"}
+                color={usingRealData ? "success" : "warning"}
+                sx={{ fontWeight: 600 }}
+              />
+              {searchTerm && (
+                <Chip 
+                  size="small"
+                  label={`${filteredTransactions.length} results`}
+                  variant="outlined"
+                />
+              )}
+            </Box>
           </Box>
 
           {/* Controls */}
           <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
             <TextField
-              placeholder="Search transactions, validators, integrators..."
+              placeholder="Search by hash, address, validator, amount, block number..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               size="small"
@@ -593,8 +692,19 @@ const ExplorerPro: React.FC = () => {
                     <Search color="action" />
                   </InputAdornment>
                 ),
+                endAdornment: searchTerm && (
+                  <InputAdornment position="end">
+                    <IconButton
+                      size="small"
+                      onClick={() => setSearchTerm('')}
+                      edge="end"
+                    >
+                      <Close sx={{ fontSize: 16 }} />
+                    </IconButton>
+                  </InputAdornment>
+                ),
               }}
-              sx={{ minWidth: 300 }}
+              sx={{ minWidth: 350 }}
             />
             
             <FormControl size="small" sx={{ minWidth: 120 }}>

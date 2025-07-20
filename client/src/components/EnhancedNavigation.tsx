@@ -368,24 +368,93 @@ const EnhancedNavigation: React.FC = () => {
           PaperProps={{
             sx: {
               mt: 1,
-              minWidth: 200,
+              minWidth: 250,
               borderRadius: 2,
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
             },
           }}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         >
-          <MenuItem onClick={handleProfileMenuClose}>
-            <Person sx={{ mr: 2 }} /> Profile
+          {/* User Info Header */}
+          <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
+              {wallet.isConnected ? 'Connected User' : 'Guest User'}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {wallet.isConnected ? wallet.address?.slice(0, 10) + '...' : 'Not connected'}
+            </Typography>
+          </Box>
+          
+          <MenuItem 
+            onClick={() => {
+              console.log('Profile clicked');
+              handleProfileMenuClose();
+              // TODO: Open profile dialog
+            }}
+            sx={{ px: 2, py: 1.5 }}
+          >
+            <ListItemIcon>
+              <Person />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Profile"
+              secondary="Manage your account"
+            />
           </MenuItem>
-          <MenuItem onClick={handleProfileMenuClose}>
-            <Security sx={{ mr: 2 }} /> Security
+          
+          <MenuItem 
+            onClick={() => {
+              console.log('Account security clicked');
+              handleProfileMenuClose();
+              // TODO: Open security settings
+            }}
+            sx={{ px: 2, py: 1.5 }}
+          >
+            <ListItemIcon>
+              <Security />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Security"
+              secondary="2FA and privacy settings"
+            />
           </MenuItem>
-          <MenuItem onClick={handleProfileMenuClose}>
-            <Settings sx={{ mr: 2 }} /> Settings
+          
+          <MenuItem 
+            onClick={() => {
+              console.log('Portfolio clicked');
+              handleProfileMenuClose();
+              // TODO: Navigate to portfolio
+            }}
+            sx={{ px: 2, py: 1.5 }}
+          >
+            <ListItemIcon>
+              <TrendingUp />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Portfolio"
+              secondary="View your staking portfolio"
+            />
           </MenuItem>
+          
+          <Divider />
+          
           {wallet.isConnected && (
-            <MenuItem onClick={handleDisconnectWallet}>
-              <Logout sx={{ mr: 2 }} /> Disconnect Wallet
+            <MenuItem 
+              onClick={() => {
+                console.log('Disconnecting wallet...');
+                handleDisconnectWallet();
+                handleProfileMenuClose();
+              }}
+              sx={{ px: 2, py: 1.5, color: 'error.main' }}
+            >
+              <ListItemIcon>
+                <Logout sx={{ color: 'error.main' }} />
+              </ListItemIcon>
+              <ListItemText 
+                primary="Disconnect Wallet"
+                secondary="Sign out from current wallet"
+              />
             </MenuItem>
           )}
         </Menu>
@@ -468,18 +537,65 @@ const EnhancedNavigation: React.FC = () => {
           PaperProps={{
             sx: {
               mt: 1,
-              minWidth: 200,
+              minWidth: 220,
               borderRadius: 2,
               boxShadow: '0 8px 32px rgba(0, 0, 0, 0.1)',
             },
           }}
+          transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+          anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
         >
-          <MenuItem onClick={toggleDarkMode}>
-            {isDarkMode ? <LightMode sx={{ mr: 2 }} /> : <DarkMode sx={{ mr: 2 }} />}
-            {isDarkMode ? 'Light Mode' : 'Dark Mode'}
+          <MenuItem 
+            onClick={() => {
+              console.log('Dark mode toggle clicked, current state:', isDarkMode);
+              toggleDarkMode();
+              handleSettingsMenuClose();
+            }}
+            sx={{ px: 2, py: 1.5 }}
+          >
+            <ListItemIcon>
+              {isDarkMode ? <LightMode /> : <DarkMode />}
+            </ListItemIcon>
+            <ListItemText 
+              primary={isDarkMode ? 'Light Mode' : 'Dark Mode'}
+              secondary={`Switch to ${isDarkMode ? 'light' : 'dark'} theme`}
+            />
           </MenuItem>
-          <MenuItem onClick={handleSettingsMenuClose}>
-            <Settings sx={{ mr: 2 }} /> Preferences
+          
+          <Divider />
+          
+          <MenuItem 
+            onClick={() => {
+              console.log('Preferences clicked');
+              handleSettingsMenuClose();
+              // TODO: Open preferences dialog
+            }}
+            sx={{ px: 2, py: 1.5 }}
+          >
+            <ListItemIcon>
+              <Settings />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Preferences"
+              secondary="App settings and configuration"
+            />
+          </MenuItem>
+          
+          <MenuItem 
+            onClick={() => {
+              console.log('Security settings clicked');
+              handleSettingsMenuClose();
+              // TODO: Open security settings
+            }}
+            sx={{ px: 2, py: 1.5 }}
+          >
+            <ListItemIcon>
+              <Security />
+            </ListItemIcon>
+            <ListItemText 
+              primary="Security"
+              secondary="Privacy and security settings"
+            />
           </MenuItem>
         </Menu>
 
