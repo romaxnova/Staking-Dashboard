@@ -1,0 +1,10 @@
+[33m8422d6f[m[33m ([m[1;36mHEAD -> [m[1;32mdesign[m[33m, [m[1;31morigin/design[m[33m)[m Fix build path for Render
+[33m527edd5[m Fix Render deployment path issues - dynamic build path detection
+[33m46cc83e[m Fix server routing and React app serving issues
+[33m8e5d326[m Disable TypeScript to eliminate memory issues
+[33mee95d2f[m Complete TypeScript fork checker removal for memory optimization
+[33m74789a8[m Aggressive memory optimization for Render deployment
+[33m1c6a882[m Optimize for Render deployment: fix memory issues and improve build process
+[33m9027441[m Add frontend deployment configuration
+[33mb1f644d[m improved overall design and minor issues
+[33mf9cd159[m separated tiers

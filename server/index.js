@@ -3,6 +3,7 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const NodeCache = require('node-cache');
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -12,6 +13,9 @@ const cache = new NodeCache({ stdTTL: 300 });
 
 app.use(cors());
 app.use(express.json());
+
+// Serve static files from React build
+app.use(express.static(path.join(__dirname, '../client/build')));
 
 // Kiln API configuration
 const KILN_API_BASE = 'https://api.kiln.fi/v1';
@@ -1579,3 +1583,8 @@ function generateMockTransactionsForExplorer(limit) {
     gasUsed: Math.floor(Math.random() * 100000) + 21000
   }));
 }
+
+// Catch-all handler: send back React's index.html file for client-side routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, '../client/build', 'index.html'));
+});

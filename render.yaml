@@ -1,15 +1,15 @@
-# Render.com deployment configuration
-# Place this in render.yaml at your repository root
+# Render.com deployment configuration for full-stack Node.js app
 
 services:
   - type: web
-    name: kiln-explorer-frontend
+    name: kiln-dashboard
     env: node
     region: oregon
-    plan: free
+    plan: starter  # Use starter plan instead of free for better memory
     buildCommand: npm run build
-    startCommand: npm start
+    startCommand: npm run start:server
     envVars:
       - key: NODE_ENV
         value: production
-    staticPublishPath: ./client/build
+      - key: PORT
+        value: 10000
