@@ -8,10 +8,9 @@
     "server:dev": "nodemon server/index.js",
     "client:dev": "cd client && npm start",
     "server": "node server/index.js",
-    "build": "cd client && rm -rf node_modules/.cache && npm install --production=false --no-audit --no-fund && NODE_OPTIONS='--max-old-space-size=256 --no-warnings' npm run build",
+    "build": "cd client && npm install && npm run build",
     "start": "node server/index.js",
-    "start:server": "node server/index.js",
-    "postinstall": "cd client && npm install --production=false --no-audit --no-fund"
+    "postinstall": "cd client && npm install"
   },
   "dependencies": {
     "@emotion/react": "^11.14.0",
