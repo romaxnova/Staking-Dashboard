@@ -1,0 +1,15 @@
+# Render.com deployment configuration
+# Place this in render.yaml at your repository root
+
+services:
+  - type: web
+    name: kiln-explorer-frontend
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+    staticPublishPath: ./client/build

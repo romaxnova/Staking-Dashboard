@@ -1,0 +1,1 @@
+ok here's the next portion of issues to address: there's an issue when opening performance tab in operators details - i've attached the screenshot: loving how you designed the Learn tab - the only thing you have to change is to modify the links - most of the time they're wrong, you should open https://docs.kiln.fi/v1 and see what you can copy from there directly; 
