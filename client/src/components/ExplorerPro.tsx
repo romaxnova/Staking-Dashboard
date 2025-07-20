@@ -135,6 +135,10 @@ const ExplorerPro: React.FC = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [searchType, setSearchType] = useState<'local' | 'api'>('local');
   
+  // API throttling states
+  const [lastKilnApiCall, setLastKilnApiCall] = useState<number>(0);
+  const [kilnApiCallCount, setKilnApiCallCount] = useState<number>(0);
+  
   // Modal states
   const [selectedTransaction, setSelectedTransaction] = useState<StakingTransaction | null>(null);
   const [selectedIntegrator, setSelectedIntegrator] = useState<StakingIntegrator | null>(null);
@@ -415,7 +419,7 @@ const ExplorerPro: React.FC = () => {
     });
   };
 
-  // Working search function that queries real APIs
+  // Enhanced search function with optimized Kiln API integration
   const handleSearch = async (query: string) => {
     if (!query || query.length < 3) {
       setSearchResults([]);
@@ -424,18 +428,162 @@ const ExplorerPro: React.FC = () => {
     }
 
     setSearchLoading(true);
-    console.log(`🔍 Searching for: "${query}"`);
+    console.log(`🔍 Enhanced search for: "${query}"`);
 
     try {
       const results: any[] = [];
-      const etherscanApiKey = 'V32JEMS9TQWJ8IQXRRHVXCJXGVNR85NT32'; // Direct API key
+      const etherscanApiKey = 'V32JEMS9TQWJ8IQXRRHVXCJXGVNR85NT32';
+      const kilnApiKey = process.env.REACT_APP_KILN_API_KEY || 'kiln_OV1Mc9Pht3bW2P8rRlhrdEi0a4xtD6yWLw8FEKLy';
+      
+      // API throttling constants
+      const KILN_API_THROTTLE_MS = 2000; // 2 seconds between calls
+      const KILN_API_MAX_CALLS_PER_MINUTE = 10;
 
-      // Check what type of search this is
+      // Pattern matching for different search types
       const isEthAddress = /^0x[a-fA-F0-9]{40}$/.test(query);
       const isTxHash = /^0x[a-fA-F0-9]{64}$/.test(query);
       const isValidatorKey = /^0x[a-fA-F0-9]{96}$/.test(query);
+      const isValidatorIndex = /^\d+$/.test(query) && parseInt(query) < 10000000; // Reasonable validator index range
 
-      // Search Etherscan for transaction hash
+      console.log(`🔍 Search patterns: address=${isEthAddress}, tx=${isTxHash}, validatorKey=${isValidatorKey}, validatorIndex=${isValidatorIndex}`);
+
+      // Helper function to check if we can make Kiln API calls
+      const canMakeKilnApiCall = () => {
+        const now = Date.now();
+        const timeSinceLastCall = now - lastKilnApiCall;
+        const callsInLastMinute = kilnApiCallCount;
+        
+        if (timeSinceLastCall < KILN_API_THROTTLE_MS) {
+          console.warn(`⚠️ Kiln API throttled: ${timeSinceLastCall}ms since last call (need ${KILN_API_THROTTLE_MS}ms)`);
+          return false;
+        }
+        
+        if (callsInLastMinute >= KILN_API_MAX_CALLS_PER_MINUTE) {
+          console.warn(`⚠️ Kiln API rate limited: ${callsInLastMinute} calls this minute`);
+          return false;
+        }
+        
+        return true;
+      };
+
+      // Track Kiln API usage
+      const trackKilnApiCall = () => {
+        setLastKilnApiCall(Date.now());
+        setKilnApiCallCount(prev => prev + 1);
+        // Reset counter every minute
+        setTimeout(() => setKilnApiCallCount(prev => Math.max(0, prev - 1)), 60000);
+      };
+
+      // 1. KILN API - Search for validators (ONLY if optimized patterns match)
+      if ((isValidatorKey || isValidatorIndex) && canMakeKilnApiCall()) {
+        try {
+          console.log('🔍 Searching Kiln API for validators...');
+          trackKilnApiCall();
+          
+          const kilnResponse = await fetch('https://api.kiln.fi/v1/validators', {
+            headers: {
+              'Authorization': `Bearer ${kilnApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (kilnResponse.ok) {
+            const kilnData = await kilnResponse.json();
+            console.log('✅ Kiln validators response received');
+            
+            // Filter validators based on search query
+            const matchingValidators = kilnData.data?.filter((validator: any) => {
+              if (isValidatorKey) {
+                return validator.public_key === query || validator.validator_address === query;
+              }
+              if (isValidatorIndex) {
+                return validator.validator_index?.toString() === query;
+              }
+              return false;
+            }) || [];
+
+            matchingValidators.forEach((validator: any) => {
+              results.push({
+                type: 'validator',
+                source: 'Kiln Connect API',
+                dataSource: 'KILN_API',
+                name: `Validator ${validator.validator_index || 'Unknown'}`,
+                publicKey: validator.public_key,
+                validatorIndex: validator.validator_index,
+                status: validator.status,
+                balance: validator.balance,
+                effectiveBalance: validator.effective_balance,
+                slashed: validator.slashed,
+                activationEpoch: validator.activation_epoch,
+                exitEpoch: validator.exit_epoch,
+                withdrawalCredentials: validator.withdrawal_credentials,
+                data: validator
+              });
+            });
+
+            if (matchingValidators.length > 0) {
+              console.log(`✅ Found ${matchingValidators.length} validators on Kiln API`);
+              setUsingRealData(true);
+            }
+          } else {
+            console.warn('⚠️ Kiln API validators request failed:', kilnResponse.status);
+          }
+        } catch (error) {
+          console.warn('⚠️ Error fetching validators from Kiln API:', error);
+        }
+      } else if (isValidatorKey || isValidatorIndex) {
+        console.warn('⚠️ Kiln API call skipped due to rate limiting');
+      }
+
+      // 2. KILN API - Search for stakes by address (ONLY if optimized and not rate limited)
+      if (isEthAddress && canMakeKilnApiCall()) {
+        try {
+          console.log('🔍 Searching Kiln API for stakes by address...');
+          trackKilnApiCall();
+          
+          const stakesResponse = await fetch(`https://api.kiln.fi/v1/eth/stakes?wallets=${query}`, {
+            headers: {
+              'Authorization': `Bearer ${kilnApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (stakesResponse.ok) {
+            const stakesData = await stakesResponse.json();
+            console.log('✅ Kiln stakes response received');
+
+            if (stakesData.data && stakesData.data.length > 0) {
+              stakesData.data.forEach((stake: any) => {
+                results.push({
+                  type: 'stake',
+                  source: 'Kiln Connect API',
+                  dataSource: 'KILN_API',
+                  name: `Stake Position`,
+                  address: query,
+                  validatorAddress: stake.validator_address,
+                  balance: stake.balance,
+                  state: stake.state,
+                  activatedAt: stake.activated_at,
+                  updatedAt: stake.updated_at,
+                  rewards: stake.rewards,
+                  grossRewards: stake.gross_rewards,
+                  data: stake
+                });
+              });
+              console.log(`✅ Found ${stakesData.data.length} stakes on Kiln API`);
+              setUsingRealData(true);
+            }
+          } else {
+            console.warn('⚠️ Kiln API stakes request failed:', stakesResponse.status);
+          }
+        } catch (error) {
+          console.warn('⚠️ Error fetching stakes from Kiln API:', error);
+        }
+      } else if (isEthAddress) {
+        console.warn('⚠️ Kiln API stakes call skipped due to rate limiting');
+      }
+
+      // 3. ETHERSCAN API - Transaction search (separate from Kiln)
       if (isTxHash) {
         try {
           console.log('🔍 Searching Etherscan for transaction:', query);
@@ -448,23 +596,26 @@ const ExplorerPro: React.FC = () => {
             
             results.push({
               type: 'transaction',
-              source: 'Etherscan',
+              source: 'Etherscan.io API',
+              dataSource: 'ETHERSCAN_API',
               hash: tx.hash,
               from: tx.from,
               to: tx.to,
               value: valueInEth,
               valueFormatted: `${valueInEth.toFixed(4)} ETH`,
               blockNumber: parseInt(tx.blockNumber || '0', 16),
+              gasPrice: parseInt(tx.gasPrice || '0', 16),
+              gasUsed: parseInt(tx.gas || '0', 16),
               data: tx
             });
             console.log('✅ Found transaction on Etherscan');
           }
         } catch (error) {
-          console.warn('Error fetching transaction from Etherscan:', error);
+          console.warn('⚠️ Error fetching transaction from Etherscan:', error);
         }
       }
 
-      // Search Etherscan for address information
+      // 4. ETHERSCAN API - Address search (separate from Kiln)
       if (isEthAddress) {
         try {
           console.log('🔍 Searching Etherscan for address:', query);
@@ -477,7 +628,8 @@ const ExplorerPro: React.FC = () => {
             
             results.push({
               type: 'address',
-              source: 'Etherscan',
+              source: 'Etherscan.io API',
+              dataSource: 'ETHERSCAN_API',
               address: query,
               balance: balanceInEth,
               balanceFormatted: `${balanceInEth.toFixed(4)} ETH`,
@@ -486,36 +638,97 @@ const ExplorerPro: React.FC = () => {
             console.log('✅ Found address on Etherscan');
           }
         } catch (error) {
-          console.warn('Error fetching address from Etherscan:', error);
+          console.warn('⚠️ Error fetching address from Etherscan:', error);
         }
       }
 
-      // Search local integrators by name
+      // 5. LOCAL DATA - Search integrators/staking providers by name
       const matchingIntegrators = integrators.filter(integrator =>
         integrator.name.toLowerCase().includes(query.toLowerCase())
       );
       
       matchingIntegrators.forEach(integrator => {
         results.push({
-          type: 'integrator',
-          source: 'Local Data',
+          type: 'staking_provider',
+          source: 'Local Cache Data',
+          dataSource: 'LOCAL_DATA',
           name: integrator.name,
           totalStaked: integrator.totalStaked,
           validators: integrator.validators,
           apy: integrator.apy,
           marketShare: integrator.marketShare,
+          stakingType: integrator.type,
           data: integrator
         });
       });
 
+      // 6. KILN API - Network stats (ONLY for specific network queries and not rate limited)
+      const networkKeywords = ['ethereum', 'eth', 'beacon', 'network', 'stats'];
+      if (networkKeywords.some(keyword => query.toLowerCase().includes(keyword)) && canMakeKilnApiCall()) {
+        try {
+          console.log('🔍 Searching Kiln API for network stats...');
+          trackKilnApiCall();
+          
+          const networkResponse = await fetch('https://api.kiln.fi/v1/eth/network-stats', {
+            headers: {
+              'Authorization': `Bearer ${kilnApiKey}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (networkResponse.ok) {
+            const networkData = await networkResponse.json();
+            console.log('✅ Kiln network stats response received');
+
+            if (networkData.data) {
+              results.push({
+                type: 'network_stats',
+                source: 'Kiln Connect API',
+                dataSource: 'KILN_API',
+                name: 'Ethereum Network Statistics',
+                totalActiveValidators: networkData.data.active_validators,
+                totalStakedEth: networkData.data.total_staked_eth,
+                networkApy: networkData.data.network_gross_apy,
+                avgValidatorBalance: networkData.data.avg_validator_balance,
+                data: networkData.data
+              });
+              console.log('✅ Found network stats on Kiln API');
+              setUsingRealData(true);
+            }
+          } else {
+            console.warn('⚠️ Kiln API network stats request failed:', networkResponse.status);
+          }
+        } catch (error) {
+          console.warn('⚠️ Error fetching network stats from Kiln API:', error);
+        }
+      } else if (networkKeywords.some(keyword => query.toLowerCase().includes(keyword))) {
+        console.warn('⚠️ Kiln API network stats call skipped due to rate limiting');
+      }
+
+      // Set results and update data source indicators
       setSearchResults(results);
-      setSearchType('api');
-      console.log(`✅ Search completed: ${results.length} results found`);
+      setSearchType(results.length > 0 ? 'api' : 'local');
+      
+      const kilnApiResults = results.filter(r => r.dataSource === 'KILN_API').length;
+      const etherscanResults = results.filter(r => r.dataSource === 'ETHERSCAN_API').length;
+      const localResults = results.filter(r => r.dataSource === 'LOCAL_DATA').length;
+      
+      console.log(`✅ Search completed: ${results.length} total results`);
+      console.log(`📊 Data sources: Kiln API (${kilnApiResults}), Etherscan API (${etherscanResults}), Local Data (${localResults})`);
+      console.log(`🔧 API usage: ${kilnApiCallCount}/min calls to Kiln API`);
+
+      // Update the data source flag based on API usage
+      if (kilnApiResults > 0 || etherscanResults > 0) {
+        setUsingRealData(true);
+      } else if (localResults > 0 && results.length === localResults) {
+        setUsingRealData(false);
+      }
 
     } catch (error) {
       console.error('❌ Search error:', error);
       setSearchResults([]);
       setSearchType('local');
+      setUsingRealData(false);
     } finally {
       setSearchLoading(false);
     }
@@ -654,14 +867,282 @@ const ExplorerPro: React.FC = () => {
 
   return (
     <Box sx={{ p: 3, backgroundColor: '#fafafa', minHeight: '100vh' }}>
-      {/* Header */}
+      {/* Header with Global Search */}
       <Box sx={{ mb: 4 }}>
         <Typography variant="h3" gutterBottom sx={{ fontWeight: 700, color: 'primary.main' }}>
           ⚡ Ethereum Staking Explorer
         </Typography>
-        <Typography variant="h6" color="text.secondary" sx={{ mb: 2 }}>
+        <Typography variant="h6" color="text.secondary" sx={{ mb: 3 }}>
           Real-time Ethereum 2.0 staking data, validators, and rewards
         </Typography>
+        
+        {/* Enhanced Global Search Bar in Header */}
+        <Box sx={{ mb: 3, position: 'relative' }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+            <Box sx={{ position: 'relative', flexGrow: 1, minWidth: 400, maxWidth: 600 }}>
+              <TextField
+                placeholder="🔍 Global Search: 0x1234... (address), 0xabc... (tx), 12345 (validator), Kiln (provider), ethereum (network)"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                size="medium"
+                fullWidth
+                variant="outlined"
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      {searchLoading ? <CircularProgress size={20} /> : <Search color="primary" />}
+                    </InputAdornment>
+                  ),
+                  endAdornment: searchTerm && (
+                    <InputAdornment position="end">
+                      <Tooltip title="Clear search">
+                        <IconButton
+                          size="small"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setSearchResults([]);
+                            setSearchType('local');
+                          }}
+                          edge="end"
+                        >
+                          <Close />
+                        </IconButton>
+                      </Tooltip>
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'background.paper',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                    '&:hover fieldset': {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'primary.main',
+                      borderWidth: 2,
+                    },
+                  }
+                }}
+              />
+              
+              {/* Enhanced Search Results Dropdown with Kiln API Data */}
+              {searchResults.length > 0 && (
+                <Paper 
+                  elevation={8} 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: '100%', 
+                    left: 0, 
+                    right: 0, 
+                    zIndex: 1000, 
+                    mt: 1,
+                    maxHeight: 400,
+                    overflow: 'auto'
+                  }}
+                >
+                  <List dense>
+                    <ListItem>
+                      <ListItemText 
+                        primary={
+                          <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 600 }}>
+                            🎯 Found {searchResults.length} results from multiple data sources
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography variant="caption" color="text.secondary">
+                            Sources: Kiln Connect API ({searchResults.filter(r => r.dataSource === 'KILN_API').length}) • 
+                            Etherscan API ({searchResults.filter(r => r.dataSource === 'ETHERSCAN_API').length}) • 
+                            Local Data ({searchResults.filter(r => r.dataSource === 'LOCAL_DATA').length})
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                    <Divider />
+                    
+                    {searchResults.map((result, index) => (
+                      <ListItem 
+                        key={index} 
+                        button 
+                        onClick={() => {
+                          if (result.type === 'transaction') {
+                            window.open(`https://etherscan.io/tx/${result.hash}`, '_blank');
+                          } else if (result.type === 'address') {
+                            window.open(`https://etherscan.io/address/${result.address}`, '_blank');
+                          } else if (result.type === 'validator') {
+                            // For Kiln validators, could open Kiln explorer or show details
+                            console.log('Validator details:', result.data);
+                          } else if (result.type === 'stake') {
+                            // For Kiln stakes, show stake details
+                            console.log('Stake details:', result.data);
+                          } else if (result.type === 'staking_provider' || result.type === 'integrator') {
+                            handleIntegratorClick(result.data);
+                          } else if (result.type === 'network_stats') {
+                            // Show network stats details
+                            console.log('Network stats:', result.data);
+                          }
+                        }}
+                        sx={{ 
+                          '&:hover': { 
+                            backgroundColor: 'primary.light',
+                            color: 'primary.contrastText',
+                            transform: 'scale(1.02)',
+                            transition: 'all 0.2s ease-in-out'
+                          }
+                        }}
+                      >
+                        <ListItemIcon>
+                          {result.type === 'transaction' && <Timeline color="primary" />}
+                          {result.type === 'address' && <AccountBalance color="secondary" />}
+                          {(result.type === 'staking_provider' || result.type === 'integrator') && <People color="warning" />}
+                          {result.type === 'validator' && <Security color="info" />}
+                          {result.type === 'stake' && <TrendingUp color="success" />}
+                          {result.type === 'network_stats' && <Analytics color="primary" />}
+                        </ListItemIcon>
+                        <ListItemText
+                          primary={
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Chip 
+                                label={result.type.replace('_', ' ').toUpperCase()} 
+                                size="small" 
+                                color={
+                                  result.type === 'transaction' ? 'primary' : 
+                                  result.type === 'address' ? 'secondary' : 
+                                  result.type === 'validator' ? 'info' :
+                                  result.type === 'stake' ? 'success' :
+                                  result.type === 'network_stats' ? 'primary' : 'warning'
+                                }
+                              />
+                              <Chip 
+                                label={result.source} 
+                                size="small" 
+                                variant="outlined"
+                                color={
+                                  result.dataSource === 'KILN_API' ? 'success' : 
+                                  result.dataSource === 'ETHERSCAN_API' ? 'info' : 'default'
+                                }
+                              />
+                              {result.dataSource === 'KILN_API' && (
+                                <Chip 
+                                  label="🔥 KILN REAL DATA" 
+                                  size="small" 
+                                  color="success"
+                                  sx={{ fontWeight: 'bold' }}
+                                />
+                              )}
+                              {result.dataSource === 'ETHERSCAN_API' && (
+                                <Chip 
+                                  label="⚡ ETHERSCAN REAL DATA" 
+                                  size="small" 
+                                  color="info"
+                                  sx={{ fontWeight: 'bold' }}
+                                />
+                              )}
+                              {result.dataSource === 'LOCAL_DATA' && (
+                                <Chip 
+                                  label="💾 CACHED" 
+                                  size="small" 
+                                  color="default"
+                                  variant="outlined"
+                                />
+                              )}
+                            </Box>
+                          }
+                          secondary={
+                            <Box sx={{ mt: 0.5 }}>
+                              {result.type === 'transaction' && (
+                                <Typography variant="body2">
+                                  🔗 {result.hash.substring(0, 20)}... • {result.valueFormatted} • Block #{result.blockNumber}
+                                </Typography>
+                              )}
+                              {result.type === 'address' && (
+                                <Typography variant="body2">
+                                  💰 {result.address.substring(0, 20)}... • Balance: {result.balanceFormatted}
+                                </Typography>
+                              )}
+                              {(result.type === 'staking_provider' || result.type === 'integrator') && (
+                                <Typography variant="body2">
+                                  🏢 {result.name} • {result.totalStaked.toLocaleString()} ETH • {result.marketShare}% market share • Type: {result.stakingType}
+                                </Typography>
+                              )}
+                              {result.type === 'validator' && (
+                                <Typography variant="body2">
+                                  🛡️ Index: {result.validatorIndex} • Status: {result.status} • Balance: {result.balance} ETH • Slashed: {result.slashed ? 'Yes' : 'No'}
+                                </Typography>
+                              )}
+                              {result.type === 'stake' && (
+                                <Typography variant="body2">
+                                  💎 Validator: {result.validatorAddress?.substring(0, 20)}... • Balance: {result.balance} ETH • State: {result.state} • Rewards: {result.rewards} ETH
+                                </Typography>
+                              )}
+                              {result.type === 'network_stats' && (
+                                <Typography variant="body2">
+                                  📊 Active Validators: {result.totalActiveValidators?.toLocaleString()} • Total Staked: {result.totalStakedEth?.toLocaleString()} ETH • Network APY: {result.networkApy}%
+                                </Typography>
+                              )}
+                            </Box>
+                          }
+                        />
+                        <ListItemIcon>
+                          <OpenInNew fontSize="small" />
+                        </ListItemIcon>
+                      </ListItem>
+                    ))}
+                  </List>
+                </Paper>
+              )}
+              
+              {/* No Results Message */}
+              {searchType === 'api' && searchResults.length === 0 && !searchLoading && searchTerm.length >= 3 && (
+                <Paper 
+                  elevation={4} 
+                  sx={{ 
+                    position: 'absolute', 
+                    top: '100%', 
+                    left: 0, 
+                    right: 0, 
+                    zIndex: 1000, 
+                    mt: 1,
+                    p: 2
+                  }}
+                >
+                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
+                    ❌ No results found for "{searchTerm}"
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', mt: 1 }}>
+                    Searched: Kiln Connect API • Etherscan.io API • Local staking providers
+                  </Typography>
+                  <Typography variant="caption" color="info.main" sx={{ textAlign: 'center', display: 'block', mt: 1, fontWeight: 600 }}>
+                    💡 Try: 0x1234... (address), 0xabc... (tx hash), 12345 (validator index), or "Kiln" (provider name)
+                  </Typography>
+                  {kilnApiCallCount >= 8 && (
+                    <Typography variant="caption" color="warning.main" sx={{ textAlign: 'center', display: 'block', mt: 1, fontWeight: 600 }}>
+                      ⚠️ Kiln API usage high ({kilnApiCallCount}/10 calls). Some searches may be limited.
+                    </Typography>
+                  )}
+                </Paper>
+              )}
+            </Box>
+            
+            {searchResults.length > 0 && (
+              <Chip 
+                label={`🎯 ${searchResults.length} results`}
+                color="success"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
+            
+            {kilnApiCallCount > 0 && (
+              <Chip 
+                label={`🔧 Kiln API: ${kilnApiCallCount}/10 calls`}
+                color={kilnApiCallCount > 7 ? "warning" : "info"}
+                size="small"
+                variant="outlined"
+              />
+            )}
+          </Box>
+        </Box>
         
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
           <Chip 
@@ -801,7 +1282,7 @@ const ExplorerPro: React.FC = () => {
               </Typography>
               <Chip 
                 size="small"
-                label={usingRealData ? "LIVE ETHERSCAN DATA" : "SIMULATED DATA"}
+                label={usingRealData ? "LIVE KILN + ETHERSCAN DATA" : "SIMULATED DATA"}
                 color={usingRealData ? "success" : "warning"}
                 sx={{ fontWeight: 600 }}
               />
@@ -815,186 +1296,18 @@ const ExplorerPro: React.FC = () => {
             </Box>
           </Box>
 
-          {/* ONE WORKING Search Bar */}
-          <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap' }}>
-            <Box sx={{ position: 'relative', minWidth: 500 }}>
-              <TextField
-                placeholder="🔍 Search: 0x1234... (address), 0xabc123... (transaction), Lido (provider)"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                size="medium"
-                fullWidth
-                variant="outlined"
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      {searchLoading ? <CircularProgress size={20} /> : <Search color="primary" />}
-                    </InputAdornment>
-                  ),
-                  endAdornment: searchTerm && (
-                    <InputAdornment position="end">
-                      <Tooltip title="Clear search">
-                        <IconButton
-                          size="small"
-                          onClick={() => {
-                            setSearchTerm('');
-                            setSearchResults([]);
-                            setSearchType('local');
-                          }}
-                          edge="end"
-                        >
-                          <Close />
-                        </IconButton>
-                      </Tooltip>
-                    </InputAdornment>
-                  ),
-                }}
-                sx={{
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'background.paper',
-                    '&:hover fieldset': {
-                      borderColor: 'primary.main',
-                      borderWidth: 2,
-                    },
-                    '&.Mui-focused fieldset': {
-                      borderColor: 'primary.main',
-                      borderWidth: 2,
-                    },
-                  }
-                }}
-              />
-              
-              {/* Search Results Dropdown */}
-              {searchResults.length > 0 && (
-                <Paper 
-                  elevation={8} 
-                  sx={{ 
-                    position: 'absolute', 
-                    top: '100%', 
-                    left: 0, 
-                    right: 0, 
-                    zIndex: 1000, 
-                    mt: 1,
-                    maxHeight: 300,
-                    overflow: 'auto'
-                  }}
-                >
-                  <List dense>
-                    <ListItem>
-                      <ListItemText 
-                        primary={
-                          <Typography variant="subtitle2" color="primary" sx={{ fontWeight: 600 }}>
-                            🎯 Found {searchResults.length} results from APIs
-                          </Typography>
-                        }
-                      />
-                    </ListItem>
-                    <Divider />
-                    
-                    {searchResults.map((result, index) => (
-                      <ListItem 
-                        key={index} 
-                        button 
-                        onClick={() => {
-                          if (result.type === 'transaction') {
-                            window.open(`https://etherscan.io/tx/${result.hash}`, '_blank');
-                          } else if (result.type === 'address') {
-                            window.open(`https://etherscan.io/address/${result.address}`, '_blank');
-                          } else if (result.type === 'integrator') {
-                            handleIntegratorClick(result.data);
-                          }
-                        }}
-                        sx={{ 
-                          '&:hover': { 
-                            backgroundColor: 'primary.light',
-                            color: 'primary.contrastText',
-                            transform: 'scale(1.02)',
-                            transition: 'all 0.2s ease-in-out'
-                          }
-                        }}
-                      >
-                        <ListItemIcon>
-                          {result.type === 'transaction' && <Timeline color="primary" />}
-                          {result.type === 'address' && <AccountBalance color="secondary" />}
-                          {result.type === 'integrator' && <People color="warning" />}
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                              <Chip 
-                                label={result.type.toUpperCase()} 
-                                size="small" 
-                                color={
-                                  result.type === 'transaction' ? 'primary' : 
-                                  result.type === 'address' ? 'secondary' : 'warning'
-                                }
-                              />
-                              <Chip 
-                                label={result.source} 
-                                size="small" 
-                                variant="outlined"
-                              />
-                            </Box>
-                          }
-                          secondary={
-                            <Box sx={{ mt: 0.5 }}>
-                              {result.type === 'transaction' && (
-                                <Typography variant="body2">
-                                  🔗 {result.hash.substring(0, 20)}... • {result.valueFormatted} • Block #{result.blockNumber}
-                                </Typography>
-                              )}
-                              {result.type === 'address' && (
-                                <Typography variant="body2">
-                                  💰 {result.address.substring(0, 20)}... • Balance: {result.balanceFormatted}
-                                </Typography>
-                              )}
-                              {result.type === 'integrator' && (
-                                <Typography variant="body2">
-                                  🏢 {result.name} • {result.totalStaked.toLocaleString()} ETH • {result.marketShare}% market share
-                                </Typography>
-                              )}
-                            </Box>
-                          }
-                        />
-                        <ListItemIcon>
-                          <OpenInNew fontSize="small" />
-                        </ListItemIcon>
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              )}
-              
-              {/* No Results Message */}
-              {searchType === 'api' && searchResults.length === 0 && !searchLoading && searchTerm.length >= 3 && (
-                <Paper 
-                  elevation={4} 
-                  sx={{ 
-                    position: 'absolute', 
-                    top: '100%', 
-                    left: 0, 
-                    right: 0, 
-                    zIndex: 1000, 
-                    mt: 1,
-                    p: 2
-                  }}
-                >
-                  <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center' }}>
-                    ❌ No results found for "{searchTerm}"
-                  </Typography>
-                  <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', mt: 1 }}>
-                    Try: 0x1234... (address), 0xabc... (transaction), or provider name like "Lido"
-                  </Typography>
-                </Paper>
-              )}
-            </Box>
+          {/* Transaction Filters Only (Search moved to header) */}
+          <Box sx={{ display: 'flex', gap: 2, mb: 3, flexWrap: 'wrap', alignItems: 'center' }}>
+            <Typography variant="h6" sx={{ mr: 2 }}>
+              Filters:
+            </Typography>
             
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Filter</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Type Filter</InputLabel>
               <Select
                 value={transactionFilter}
                 onChange={(e) => setTransactionFilter(e.target.value)}
-                label="Filter"
+                label="Type Filter"
               >
                 <MenuItem value="all">All Types</MenuItem>
                 <MenuItem value="deposit">Deposits</MenuItem>
@@ -1003,23 +1316,37 @@ const ExplorerPro: React.FC = () => {
               </Select>
             </FormControl>
 
-            <FormControl size="small" sx={{ minWidth: 120 }}>
-              <InputLabel>Sort</InputLabel>
+            <FormControl size="small" sx={{ minWidth: 140 }}>
+              <InputLabel>Sort By</InputLabel>
               <Select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                label="Sort"
+                label="Sort By"
               >
                 <MenuItem value="time">Latest First</MenuItem>
                 <MenuItem value="amount">Highest Amount</MenuItem>
               </Select>
             </FormControl>
             
+            {searchTerm && (
+              <Chip 
+                label={`🔍 Searching: "${searchTerm}"`}
+                onDelete={() => {
+                  setSearchTerm('');
+                  setSearchResults([]);
+                  setSearchType('local');
+                }}
+                color="primary"
+                variant="outlined"
+                sx={{ fontWeight: 600 }}
+              />
+            )}
+            
             {searchResults.length > 0 && (
               <Chip 
                 label={`🎯 ${searchResults.length} API results`}
                 color="success"
-                sx={{ ml: 1, fontWeight: 600 }}
+                sx={{ fontWeight: 600 }}
               />
             )}
           </Box>

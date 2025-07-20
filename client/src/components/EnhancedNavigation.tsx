@@ -247,10 +247,12 @@ const EnhancedNavigation: React.FC = () => {
           ))}
         </Box>
 
-        {/* Search Component */}
-        <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mr: 3 }}>
-          <SearchComponent />
-        </Box>
+        {/* Search Component - Hide on explorer page since it has its own enhanced search */}
+        {!location.pathname.includes('/explorer') && (
+          <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', mr: 3 }}>
+            <SearchComponent />
+          </Box>
+        )}
 
         {/* Network Status */}
         <Box sx={{ display: 'flex', alignItems: 'center', mr: 3 }}>
