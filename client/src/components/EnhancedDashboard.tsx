@@ -236,7 +236,11 @@ const MetricCard: React.FC<MetricCardProps> = ({
   );
 };
 
-const EnhancedDashboard: React.FC = () => {
+interface EnhancedDashboardProps {
+  walletAddress?: string;
+}
+
+const EnhancedDashboard: React.FC<EnhancedDashboardProps> = ({ walletAddress }) => {
   const theme = useTheme();
   const { addNotification } = useAppContext();
   const [loading, setLoading] = useState(true);

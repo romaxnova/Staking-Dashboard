@@ -21,3 +21,4 @@ export { default as ExplorerHomepage } from './ExplorerHomepage';
 export { default as IntegratorsPage } from './IntegratorsPage';
 export { default as OperatorsPage } from './OperatorsPage';
 export { default as FreeProfileSystem } from './FreeProfileSystem';
+export { default as LearnPage } from './LearnPage';

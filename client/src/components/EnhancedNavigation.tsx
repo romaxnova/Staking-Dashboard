@@ -154,7 +154,7 @@ const EnhancedNavigation: React.FC = () => {
     <AppBar 
       position="fixed" 
       sx={{ 
-        zIndex: (theme) => theme.zIndex.drawer + 1,
+        zIndex: 1200, // Reduced z-index to avoid conflicts
         backdropFilter: 'blur(20px)',
         backgroundColor: alpha('#FFFFFF', 0.95),
         borderBottom: '1px solid',

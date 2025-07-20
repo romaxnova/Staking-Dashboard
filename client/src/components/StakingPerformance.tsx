@@ -584,7 +584,7 @@ const StakingPerformance: React.FC = () => {
   }
 
   return (
-    <Box sx={{ p: 3 }}>
+    <Box sx={{ pt: '80px', p: 3 }}> {/* Added top padding for fixed navigation */}
       {/* Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
         <Box>
