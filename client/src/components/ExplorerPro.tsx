@@ -26,32 +26,25 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  Tab,
-  Tabs,
   Dialog,
   DialogTitle,
   DialogContent,
   DialogActions,
-  Fab,
   SpeedDial,
   SpeedDialAction,
   SpeedDialIcon,
   Zoom,
   Fade,
-  Slide,
-  Collapse,
   List,
   ListItem,
   ListItemText,
   ListItemIcon,
   Badge,
   useTheme,
-  useMediaQuery,
-  Skeleton
+  useMediaQuery
 } from '@mui/material';
 import {
   TrendingUp,
-  People,
   AccountTree,
   AccountBalance,
   Search,
@@ -59,9 +52,6 @@ import {
   OpenInNew,
   Schedule,
   Security,
-  Timeline,
-  FilterList,
-  SwapVert,
   Analytics,
   Download,
   Share,
@@ -69,10 +59,7 @@ import {
   Close,
   TrendingDown,
   MonetizationOn,
-  Language,
-  Speed,
   AutoAwesome,
-  Fullscreen,
   Notifications,
   BookmarkAdd
 } from '@mui/icons-material';
@@ -993,7 +980,7 @@ const ExplorerPro: React.FC = () => {
                         }}
                       >
                         <ListItemIcon>
-                          {result.type === 'transaction' && <Timeline color="primary" />}
+                          {result.type === 'transaction' && <Analytics color="primary" />}
                           {result.type === 'address' && <AccountBalance color="secondary" />}
                           {(result.type === 'staking_provider' || result.type === 'integrator') && <People color="warning" />}
                           {result.type === 'validator' && <Security color="info" />}
