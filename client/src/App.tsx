@@ -67,7 +67,7 @@ const AppContent: React.FC = () => {
                   onWalletDisconnect={handleWalletDisconnect}
                 />
                 <Routes>
-                  <Route path="/" element={<ExplorerHomepage />} />
+                  <Route path="/" element={<ExplorerPro />} />
                   <Route path="/integrators" element={<IntegratorsPage />} />
                   <Route path="/operators" element={<OperatorsPage />} />
                   <Route path="/profile" element={<FreeProfileSystem />} />
