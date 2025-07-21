@@ -4,7 +4,8 @@
     "lib": [
       "dom",
       "dom.iterable",
-      "es6"
+      "es2017",
+      "es2018"
     ],
     "allowJs": true,
     "skipLibCheck": true,
@@ -20,7 +21,12 @@
     "noEmit": true,
     "jsx": "react-jsx",
     "incremental": false,
-    "tsBuildInfoFile": null
+    "tsBuildInfoFile": null,
+    "types": [
+      "node",
+      "react",
+      "react-dom"
+    ]
   },
   "include": [
     "src"
