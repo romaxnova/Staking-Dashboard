@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Card, CardContent, Chip, CircularProgress, Alert } from '@mui/material';
 
+// Clean interfaces - no unused code
 interface Account {
   id: string;
   name: string;
