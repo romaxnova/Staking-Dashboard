@@ -4,7 +4,7 @@ import { ThemeProvider } from '@mui/material/styles';
 import CssBaseline from '@mui/material/CssBaseline';
 import { AppProvider } from './context/AppContext';
 import { kilnTheme } from './theme/kilnTheme';
-import { ErrorBoundary } from './components/ErrorBoundary';
+import ErrorBoundary from './components/ErrorBoundary';
 import { EnhancedNavigation } from './components/EnhancedNavigation';
 import { EnhancedDashboard } from './components/EnhancedDashboard';
 import { ExplorerHomepage } from './components/ExplorerHomepage';
