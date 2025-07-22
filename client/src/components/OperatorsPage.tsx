@@ -176,9 +176,9 @@ const OperatorsPage: React.FC = () => {
           monthlyGrowth: 12.3,
           isWatched: false,
           keyPersonnel: {
-            ceo: 'Laszlo Giricz',
-            cto: 'Rémy Roy',
-            headOfStaking: 'Guillaume Bonnaud',
+            ceo: 'Laszlo Szabo',
+            cto: 'Someone',
+            headOfStaking: 'Somebody',
           },
           businessModel: 'White-label',
           serviceLevel: 'Enterprise',
