@@ -130,10 +130,10 @@ const PublicHeader: React.FC<PublicHeaderProps> = ({
             </Box>
             <Box>
               <Typography variant="h6" sx={{ fontWeight: 700, fontSize: '1.25rem' }}>
-                Kiln Explorer
+                Kiln Explorer Demo
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.75rem' }}>
-                Ethereum Staking Analytics
+                Staking Analytics
               </Typography>
             </Box>
           </Box>
