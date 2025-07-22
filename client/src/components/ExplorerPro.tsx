@@ -1583,7 +1583,7 @@ const ExplorerPro: React.FC = () => {
       {/* Footer */}
       <Box sx={{ textAlign: 'center', mt: 6, py: 3 }}>
         <Typography variant="body2" color="text.secondary">
-          🔥 Elite Ethereum Staking Explorer • Real Kiln API + Etherscan Data • Built for Technical PM Interview
+          🔥 Staking Explorer • Real Kiln API + Etherscan Data
         </Typography>
         <Typography variant="caption" color="text.secondary">
           Features: Real-time staking data, advanced analytics, interactive modals, search, market analysis
