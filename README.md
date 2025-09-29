@@ -2,6 +2,8 @@
 
 This project is an exploration of what a staking aggregator platform could be. It is inspired by the Kiln dashboard at its foundation and aims to improve upon its design and functionalities.
 
+https://kiln-pm.vercel.app
+
 Key points:
 - Built primarily with TypeScript, with supporting JavaScript and HTML.
 - Focuses on user experience improvements and extended features beyond the original dashboard.
@@ -11,7 +13,7 @@ Key points:
 
 ## Features
 
-- Enhanced dashboard for tracking staking performance
+- Enhanced dashboard for tracking staking performance (limited to ETH)
 - Aggregation of staking opportunities across multiple networks
 - User-centric design improvements over the original dashboard
 
